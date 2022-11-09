@@ -18,4 +18,9 @@ def makeCSVFile (fileName, Nrows, NColum):
 
     f.close()
 
-makeCSVFile("matrix.txt",10000,70)
+Nrows = 1000
+NColum = 6
+makeCSVFile("1sequence/matrix.txt",Nrows=Nrows,NColum=NColum)
+#makeCSVFile("./2openMP/matrix.txt",Nrows=Nrows,NColum=NColum)
+
+print(f"Created a test file with:\n rows: {Nrows} \n columns: {NColum}")
