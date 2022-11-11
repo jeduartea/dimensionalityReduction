@@ -1,5 +1,5 @@
-#@title hello_world.cu
-%%writefile hello_worldC.cu
+#@title main_cuda.cu
+%%writefile main_cuda.cu
 /*******************************************************************************
 *
 * Program: Dimensionality Reduction With Entropy to a data Matrix set
@@ -21,20 +21,17 @@
 // For the CUDA runtime routines (prefixed with "cuda_")
 #include <cuda_runtime.h>
 
-#define MATRIX_ROW 1000
-#define MATRIX_COLUNM 6
+#define MATRIX_ROW 2560
+#define MATRIX_COLUNM 10
 #define STRING_LENGTH 4
 #define MAX_LEN_LINE STRING_LENGTH*MATRIX_COLUNM
 
 #define PRINT_LOGS 0
 #define PRINT_LOGS_MATRIX 0
 
-#define BLOCKSPERGRID  1
-#define NUMTHREADS 1
+#define BLOCKSPERGRID  40
+#define NUMTHREADS 64
 
-
-//Matrix type double (*)[MATRIX_ROW]
-double similarity_matrix[MATRIX_ROW][MATRIX_ROW]={0.0};
 
 //Matrix type char (*)[MATRIX_COLUNM][STRING_LENGTH]
 char main_matrix[MATRIX_ROW][MATRIX_COLUNM][STRING_LENGTH]={/*  */};
@@ -52,29 +49,6 @@ __device__ int hammingDist_CUDA (char* str1, char* str2)
     return count;
 }
 
-int hammingDist(char* str1, char* str2)
-{
-    int i = 0, count = 0;
-    while (str1[i] != '\0') {
-        if (str1[i] == str2[i] && str1[i] != '\n' && str2[i] != '\n')
-            count++;
-        i++;
-    }
-    return count;
-}
-
-void printDataMatrix(char data_matrix[][MATRIX_COLUNM][STRING_LENGTH])
-{
-    // Print read data
-    printf("Printing read matrix:\n");
-    for(int i=0; i<MATRIX_ROW; i++){
-        for (int j=0; j<MATRIX_COLUNM; j++){
-            printf("%s ", data_matrix[i][j]);
-        }
-        //printf(" %d",i);
-        printf("\n");
-    }
-}
 
 void readCSVFile (char main_matrix[MATRIX_ROW][MATRIX_COLUNM][STRING_LENGTH])
 {
@@ -116,98 +90,12 @@ void readCSVFile (char main_matrix[MATRIX_ROW][MATRIX_COLUNM][STRING_LENGTH])
         
     }
     fclose(file);
-    if (PRINT_LOGS_MATRIX)
-        printDataMatrix(main_matrix);
 
     if (PRINT_LOGS){   
     printf("-----------------------------------------\n");
     printf("END - function: readCSVFile \n");
     printf("-----------------------------------------\n");
     }
-}
-
-void printSimilarityMatrix( double similarity_matrix[MATRIX_ROW][MATRIX_ROW])
-{
-
-    // Print similarity matrix
-    printf("Printing similarity matrix:\n");
-    for(int i=0; i<MATRIX_ROW; i++){
-        for (int j=0; j<MATRIX_ROW; j++){
-            printf("%f ", similarity_matrix[i][j]);
-        }
-        printf("\n");
-    }
-
-}
-
-
-void entropyCalculation (char data_matrix[][MATRIX_COLUNM][STRING_LENGTH],double similarity_matrix[][MATRIX_ROW],int withoutColum, double *final_entropy)
-{
-    
-    if (PRINT_LOGS){
-    printf("-----------------------------------------\n");
-    printf("BEGIN - function: entropyCalculation for column %d\n", withoutColum);
-    printf("-----------------------------------------\n");
-    }
-
-    //Matrix type double (*)[MATRIX_ROW]
-    //double similarity_matrix[MATRIX_ROW][MATRIX_ROW];
-
-    if (PRINT_LOGS){
-    printf("Begin - calculation of the similarity matrix for column %d ...\n\n", withoutColum);
-    }
-
-    double sum=0;
-    for(int row_s=0; row_s < MATRIX_ROW; row_s++){
-        for(int column_s=0; column_s< MATRIX_ROW; column_s++){
-
-            for (int column_d=0; column_d < MATRIX_COLUNM; column_d++){
-                if (withoutColum == 0){
-                   sum = sum + hammingDist(data_matrix[row_s][column_d],data_matrix[column_s][column_d]);
-                }
-                else{
-                    if (withoutColum-1 != column_d)
-                        sum = sum + hammingDist(data_matrix[row_s][column_d],data_matrix[column_s][column_d]);
-
-                }
-                
-            }
-            if (withoutColum == 0)
-                similarity_matrix[row_s][column_s]= (double) sum/MATRIX_COLUNM;
-            
-            else
-                similarity_matrix[row_s][column_s]= (double) sum/(MATRIX_COLUNM-1);
-            
-
-            sum=0;
-        }
-    }
-
-    if (PRINT_LOGS_MATRIX){
-        printSimilarityMatrix(similarity_matrix);
-    }
-    if (PRINT_LOGS){
-        printf("\nEnd - calculation of the similarity matrix for column %d.\n\n", withoutColum);
-        printf("Begin - calculation of entroy for column %d...\n\n", withoutColum);
-        }
-
-    double entropy=0;
-    for (int i=0; i < MATRIX_ROW-2; i++){
-        for (int j=i+1; j < MATRIX_ROW-1;j++){
-            if (similarity_matrix[i][j] != 0.0)
-               entropy = entropy + ((similarity_matrix[i][j]*log(similarity_matrix[i][j])) +  ((1-similarity_matrix[i][j]) * log(1-similarity_matrix[i][j])));
-        }
-    }
-    entropy = (-1)* entropy;
-    if (PRINT_LOGS){
-    printf("The entropy value for column %d is: %f\n\n", withoutColum,entropy);
-    printf("end - calculation of entroy for column %d.\n", withoutColum);
-
-    printf("-----------------------------------------\n");
-    printf("END - function: entropyCalculation for column %d\n", withoutColum);
-    printf("-----------------------------------------\n");
-    }
-    final_entropy[withoutColum] = entropy;
 }
 
 
@@ -218,22 +106,19 @@ __global__ void entropyCalculation_CUDA (char *data_matrix, double *similarity_m
     // similarityMatrix
     double sum=0;
 
-    // se esta rompiendo las filas de la matrix de similaridad
-    // importante el numero de hilo lanzado debe ser igual al numero de filas en el data set
-
     //for(int row_s=0; row_s < MATRIX_ROW; row_s++){
 
     for(int column_s=0; column_s< MATRIX_ROW; column_s++){
 
         for (int column_d=0; column_d < MATRIX_COLUNM; column_d++){
             if (withoutColum == 0){
-                //matrix[index_row*MATRIX_COLUNM*STRING_LENGTH + column*STRING_LENGTH + length ]
-                sum = sum + hammingDist_CUDA((char *) data_matrix[index_row*MATRIX_COLUNM + column_d], (char *) data_matrix[column_s*MATRIX_COLUNM + column_d]);
+
+                sum = sum + hammingDist_CUDA(&data_matrix[index_row*MATRIX_COLUNM*STRING_LENGTH + column_d*STRING_LENGTH], &data_matrix[column_s*MATRIX_COLUNM*STRING_LENGTH + column_d*STRING_LENGTH]);
                 //sum = sum + hammingDist_CUDA(data_matrix[row_s][column_d],data_matrix[column_s][column_d]);
             }
             else{
                 if (withoutColum-1 != column_d)
-                    sum = sum + hammingDist_CUDA((char *) data_matrix[index_row*MATRIX_COLUNM + column_d],(char *) data_matrix[column_s*MATRIX_COLUNM + column_d]);
+                    sum = sum + hammingDist_CUDA(&data_matrix[index_row*MATRIX_COLUNM*STRING_LENGTH + column_d*STRING_LENGTH], &data_matrix[column_s*MATRIX_COLUNM*STRING_LENGTH + column_d*STRING_LENGTH]);
                     //sum = sum + hammingDist_CUDA(data_matrix[row_s][column_d],data_matrix[column_s][column_d]);
 
             }
@@ -262,31 +147,13 @@ __global__ void entropyCalculation_CUDA (char *data_matrix, double *similarity_m
         for (int i=0; i < MATRIX_ROW-2; i++){
             for (int j=i+1; j < MATRIX_ROW-1;j++){
                 if (similarity_matrix[i*MATRIX_ROW + j] != 0.0)
-                entropy = entropy + ((similarity_matrix[i*MATRIX_ROW + j]*log(similarity_matrix[i*MATRIX_ROW + j])) +  ((1-similarity_matrix[i*MATRIX_ROW + j]) * log(1-similarity_matrix[i*MATRIX_ROW + j])));
+                entropy = entropy + ((similarity_matrix[i*MATRIX_ROW + j]*logf(similarity_matrix[i*MATRIX_ROW + j])) +  ((1-similarity_matrix[i*MATRIX_ROW + j]) * logf(1-similarity_matrix[i*MATRIX_ROW + j])));
             }
         }
         entropy = (-1) * entropy;
-        *final_entropy = entropy;
+        final_entropy[withoutColum] = entropy;
 
     }
-}
-
-
-__global__ void addMatrix (int *matrix,int *output)
-{
-    int sum=0;
-    int index_row = (blockDim.x * blockIdx.x) + threadIdx.x;
-    for (int column = 0; column < MATRIX_COLUNM; column++)
-    {  
-        for (int length = 0; length < STRING_LENGTH; length++)
-        {
-            sum = sum + matrix[index_row*MATRIX_COLUNM*STRING_LENGTH + column*STRING_LENGTH + length ];
-            //sum = sum + *(*(*(matrix+index_row)+column)+length);
-        }
-    }
-
-    output[index_row] = sum;
-    sum = 0;
 }
 
 
@@ -304,14 +171,6 @@ int main ()
     //reading CSV file
     readCSVFile(main_matrix);
 
-    //Array that has all entropy values
-    double vaulesOfEntropyWithoutColums [MATRIX_COLUNM+1];
-
-    entropyCalculation(main_matrix, similarity_matrix,0,vaulesOfEntropyWithoutColums);
-
-    printf("The entropy values for each column are as follows:\n");
-    printf("    The value without the column %d: %f\n",0,vaulesOfEntropyWithoutColums[0]);
-
     //*******************************************************
     // BEGIN CUDA CODE
     //*******************************************************
@@ -320,9 +179,11 @@ int main ()
     // Flating main matrix AND similarity matrix
     // varibles in host
     char *h_main_matrix = (char *) main_matrix;
-    double *h_similarity_matrix = (double *) similarity_matrix;
-    
-    double h_entropy=0.0;
+    //double *h_similarity_matrix = (double *) similarity_matrix;
+
+    //Array that has all entropy values
+    double h_entropy[MATRIX_COLUNM+1];
+
     // varibles in device
     char *d_main_matrix;
     double *d_similarity_matrix;
@@ -330,8 +191,8 @@ int main ()
 
     //getting size of each varible
     int size_main_matrix = sizeof(main_matrix);
-    int size_similarity_matrix = sizeof(similarity_matrix);
-    int size_entropy = sizeof(double);
+    int size_similarity_matrix = sizeof(double)*MATRIX_ROW*MATRIX_ROW;
+    int size_entropy = sizeof(h_entropy);
 
  
     //---------------------------
@@ -378,18 +239,8 @@ int main ()
     }
 
     //For similarity_matrix
-    err = cudaMemcpy(d_similarity_matrix, h_similarity_matrix, size_similarity_matrix, cudaMemcpyHostToDevice);
-    if (err != cudaSuccess){
-        fprintf(stderr, "Failed to copy vector h_similarity_matrix from host to device (error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
 
     //For h_entropy
-    err = cudaMemcpy(d_entropy, &h_entropy, size_entropy, cudaMemcpyHostToDevice);
-    if (err != cudaSuccess){
-        fprintf(stderr, "Failed to copy vector h_entropy from host to device (error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
 
     //---------------------------
     // END  - COPY VAULE TO DEVICE
@@ -401,7 +252,11 @@ int main ()
     //---------------------------
 
     // __global__ void entropyCalculation_CUDA (char *data_matrix, double *similarity_matrix, double *final_entropy,int withoutColum)
-    entropyCalculation_CUDA<<<100,10>>>(d_main_matrix, d_similarity_matrix,d_entropy, 0);
+    
+    // Launch kernel N times (numbers columns) 
+    for (int column = 0; column < MATRIX_COLUNM+1; column++){
+    entropyCalculation_CUDA<<<NUMTHREADS,BLOCKSPERGRID>>>(d_main_matrix, d_similarity_matrix,d_entropy, column);
+    }
     //---------------------------
     // END -  LAUNCH KERNEL
     //---------------------------
@@ -430,7 +285,13 @@ int main ()
     //For h_entropy
     printf("\n");
     printf("The entropy values for each column are as follows:\n");
-    printf("    The value with all columns    : %f\n",h_entropy);
+    for (int i = 0; i < MATRIX_COLUNM+1; i++){
+        if (i==0) // 0 in is saved the entropy vaule with all the columns
+            printf("    The value with all columns    : %f\n",h_entropy[i]);
+
+        else
+            printf("    The value without the column %d: %f\n",i,h_entropy[i]);
+    }
 
     //---------------------------
     // END -  PRINT DATA FROM GPU
@@ -442,25 +303,25 @@ int main ()
     //---------------------------
 
     //For d_main_matrix
-    err = cudaFree(d_main_matrix);
-    if (err != cudaSuccess){
-        fprintf(stderr, "Failed to free device vector d_main_matrix (error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    // err = cudaFree(d_main_matrix);
+    // if (err != cudaSuccess){
+    //     fprintf(stderr, "Failed to free device vector d_main_matrix (error code %s)!\n", cudaGetErrorString(err));
+    //     exit(EXIT_FAILURE);
+    // }
 
-    //For similarity_matrix
-    err = cudaFree(d_similarity_matrix);
-    if (err != cudaSuccess){
-        fprintf(stderr, "Failed to free device vector d_similarity_matrix (error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    // //For similarity_matrix
+    // err = cudaFree(d_similarity_matrix);
+    // if (err != cudaSuccess){
+    //     fprintf(stderr, "Failed to free device vector d_similarity_matrix (error code %s)!\n", cudaGetErrorString(err));
+    //     exit(EXIT_FAILURE);
+    // }
 
-    //For h_entropy
-    err = cudaFree(d_entropy);
-    if (err != cudaSuccess){
-        fprintf(stderr, "Failed to free device vector d_entropy (error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    // //For h_entropy
+    // err = cudaFree(d_entropy);
+    // if (err != cudaSuccess){
+    //     fprintf(stderr, "Failed to free device vector d_entropy (error code %s)!\n", cudaGetErrorString(err));
+    //     exit(EXIT_FAILURE);
+    // }
 
     //---------------------------
     // END - FREE MEMORY
@@ -480,4 +341,3 @@ int main ()
     printf("\nTime elapsed: %ld.%06ld\n", (long int)tval_result.tv_sec, (long int)tval_result.tv_usec);
     return 0;
 }
-
