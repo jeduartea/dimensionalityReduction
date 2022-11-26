@@ -18,8 +18,8 @@ def makeCSVFile (fileName, Nrows, NColum):
 
     f.close()
 
-Nrows = 1000
-NColum = 6
+Nrows = 2560
+NColum = 10
 makeCSVFile("1sequence/matrix.txt",Nrows=Nrows,NColum=NColum)
 #makeCSVFile("./2openMP/matrix.txt",Nrows=Nrows,NColum=NColum)
 

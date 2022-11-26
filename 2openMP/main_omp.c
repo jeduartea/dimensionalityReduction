@@ -10,6 +10,7 @@
 *
 * Octuber 2022
 *******************************************************************************/
+//gcc main_omp.c -o main_omp.o -fopenmp -lm
 
 #include <stdio.h>
 #include <math.h>
@@ -17,8 +18,8 @@
 #include <sys/time.h>
 #include "omp.h"
 
-#define MATRIX_ROW 10000
-#define MATRIX_COLUNM 6
+#define MATRIX_ROW 2560
+#define MATRIX_COLUNM 10
 #define STRING_LENGTH 4
 #define MAX_LEN_LINE STRING_LENGTH*MATRIX_COLUNM
 
@@ -177,7 +178,7 @@ double entropyCalculation (char data_matrix[][MATRIX_COLUNM][STRING_LENGTH],doub
 
     double entropy=0;
  
-    #pragma omp parallel for reduction(+:entropy)
+    //#pragma omp parallel for reduction(+:entropy)
     for (int i=0; i < MATRIX_ROW-2; i++){
         for (int j=i+1; j < MATRIX_ROW-1;j++){
             if (similarity_matrix[i][j] != 0.0)
@@ -199,7 +200,7 @@ double entropyCalculation (char data_matrix[][MATRIX_COLUNM][STRING_LENGTH],doub
 
 
 int main (){
-    printf("****************************************************************************\n");
+    printf("***************************************************************************\n");
     printf("    BEGIN - Entropy Calculation for Dimensionality Reduction with OMP\n");
     printf("***************************************************************************\n\n");
 
@@ -236,7 +237,7 @@ int main (){
     gettimeofday(&tval_after, NULL);
     timersub(&tval_after, &tval_before, &tval_result);
 
-    printf("\n****************************************************************************\n");
+    printf("\n***************************************************************************\n");
     printf("    END - Entropy Calculation for Dimensionality Reduction with OMP\n");
     printf("***************************************************************************\n");
     printf("\nTime elapsed: %ld.%06ld\n", (long int)tval_result.tv_sec, (long int)tval_result.tv_usec);

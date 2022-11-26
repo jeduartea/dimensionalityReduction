@@ -10,14 +10,15 @@
 *
 * Octuber 2022
 *******************************************************************************/
+// gcc main_sequential.c -o main_sequential.o -lm
 
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
 #include <sys/time.h>
 
-#define MATRIX_ROW 1000
-#define MATRIX_COLUNM 6
+#define MATRIX_ROW 2560
+#define MATRIX_COLUNM 10
 #define STRING_LENGTH 4
 #define MAX_LEN_LINE STRING_LENGTH*MATRIX_COLUNM
 
@@ -256,7 +257,7 @@ void entropyCalculation2 (char data_matrix[][MATRIX_COLUNM][STRING_LENGTH],doubl
 
 int main (){
 
-    printf("****************************************************************************\n");
+    printf("***************************************************************************\n");
     printf("    BEGIN - Entropy Calculation for Dimensionality Reduction\n");
     printf("***************************************************************************\n\n");
 
@@ -290,7 +291,7 @@ int main (){
     gettimeofday(&tval_after, NULL);
     timersub(&tval_after, &tval_before, &tval_result);
     
-    printf("\n****************************************************************************\n");
+    printf("\n***************************************************************************\n");
     printf("    END - Entropy Calculation for Dimensionality Reduction\n");
     printf("***************************************************************************\n");
     printf("\nTime elapsed: %ld.%06ld\n", (long int)tval_result.tv_sec, (long int)tval_result.tv_usec);
